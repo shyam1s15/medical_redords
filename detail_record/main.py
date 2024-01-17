@@ -5,6 +5,7 @@ import psycopg2
 from psycopg2 import sql
 import os
 from psycopg2.extras import RealDictCursor
+from api_response import APIResponse
 
 db_params = {
     'host': os.environ.get('DB_HOST'),
@@ -42,7 +43,9 @@ def detail_record(request: flask.Request)-> flask.typing.ResponseReturnValue:
             "id": id
         }
         result = execute_query(connection, select_query, query_params)
-        return jsonify({'results': result})
+        return APIResponse.ok_with_data(result)
+        # return jsonify({'results': result})
     except Exception as e:
             print(f"Error: {str(e)}")
+    return APIResponse.error_with_message("Something went wrong")
 
