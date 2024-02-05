@@ -30,6 +30,16 @@ Session = sessionmaker(bind=engine)
 session = Session()
 Base = declarative_base()
 
+def non_null_non_empty(data, key):
+    value = data.get(key)
+    if value is None:
+        return False
+    
+    if isinstance(value, list):
+        return len(value) > 0
+    else:
+        return True
+    
 class Record(Base):
     __tablename__ = 'mo_records'
     id = Column(Integer, primary_key=True)
@@ -57,6 +67,9 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
     
     parsed_opd_date = datetime.strptime(json_data["opd_date"], "%a, %d %b %Y %H:%M:%S %Z").date()
     parsed_updated_at = datetime.strptime(json_data["updated_at"], "%a, %d %b %Y %H:%M:%S %Z")
+    if not non_null_non_empty(json_data, "groups"): 
+        return APIResponse.error_with_code_message(message="groups are not present cannot save")
+    
     record_saved = Record(
         id=json_data.get("id"),
         opd_type=json_data["opd_type"],
@@ -66,11 +79,17 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
 
     record_saved = session.merge(record_saved)
     session.query(RecordGroup).filter(RecordGroup.record_id == record_saved.id).delete()
-    new_group_data = [
-        RecordGroup(name='0-15 years', new_male=10, new_female=20, old_male=5, old_female=15, record_id=record_saved.id),
-        RecordGroup(name='15-60 years', new_male=15, new_female=25, old_male=8, old_female=18, record_id=record_saved.id),
-        RecordGroup(name='60+ years', new_male=15, new_female=25, old_male=8, old_female=18, record_id=record_saved.id),
-    ]
+    new_group_data = []
+    for index, group in enumerate(json_data.get("groups")):
+        name = ""
+        if index == 0:
+            name = "0-15 years"
+        elif index == 1:
+            name = "15-60 years"
+        else:
+            name = "60+ years"
+        g = RecordGroup(name=name, new_male=group.get("new_male", 0), new_female=group.get("new_female", 0), old_male=group.get("old_male", 0), old_female=group.get("old_female", 0), record_id=record_saved.id)
+        new_group_data.append(g)
     session.add_all(new_group_data)
     session.commit()
 
