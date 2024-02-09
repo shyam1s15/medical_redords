@@ -35,11 +35,26 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
         print(page_id)
         print(page_limit)
         # Example SELECT query with named placeholders for pagination
-        select_query = sql.SQL("""
-                SELECT r.*, json_agg(g.*) AS groups
-                FROM mo_records r
-                LEFT JOIN record_groups g ON r.id = g.record_id
-                GROUP BY r.id LIMIT %(limit)s OFFSET %(offset)s""")
+        
+        # select_query = sql.SQL("""
+        #         SELECT r.*, json_agg(g.*) AS groups
+        #         FROM mo_records r
+        #         LEFT JOIN record_groups g ON r.id = g.record_id
+        #         GROUP BY r.id LIMIT %(limit)s OFFSET %(offset)s""")
+
+        
+        select_query = sql.SQL("""SELECT 
+            r.*, 
+            COALESCE(SUM(COALESCE(g.new_male, 0)) + SUM(COALESCE(g.new_female, 0)), 0) AS new_total, 
+            COALESCE(SUM(COALESCE(g.old_male, 0)) + SUM(COALESCE(g.old_female, 0)), 0) AS old_total 
+        FROM 
+            mo_records r 
+        JOIN 
+            record_groups g ON r.id = g.record_id 
+        GROUP BY 
+            r.id 
+        ORDER BY r.id desc 
+        LIMIT %(limit)s OFFSET %(offset)s""")
 
         # Parameters for the query
         query_params = {'limit': page_limit, 'offset': page_id*page_limit}

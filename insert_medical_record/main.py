@@ -1,7 +1,5 @@
 from flask import Flask, request, jsonify
 import flask
-from types import SimpleNamespace
-import json
 from sqlalchemy import Column, DateTime, Integer, String, create_engine, Date
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
@@ -62,11 +60,8 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
     # Use request.get_json() to get parsed JSON data
     json_data = request.get_json()
 
-    # Convert the parsed JSON data to SimpleNamespace
-    #data = json.loads(json.dumps(json_data), object_hook=lambda d: SimpleNamespace(**d))
-    
     parsed_opd_date = datetime.strptime(json_data["opd_date"], "%a, %d %b %Y %H:%M:%S %Z").date()
-    parsed_updated_at = datetime.strptime(json_data["updated_at"], "%a, %d %b %Y %H:%M:%S %Z")
+    parsed_updated_at = datetime.strptime(json_data["updated_at"], "%a, %d %b %Y %H:%M:%S %Z").date()
     if not non_null_non_empty(json_data, "groups"): 
         return APIResponse.error_with_code_message(message="groups are not present cannot save")
     
@@ -93,5 +88,10 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
     session.add_all(new_group_data)
     session.commit()
 
-    return APIResponse.ok_with_data("data saved successfully")
+    resp = flask.jsonify(APIResponse.ok_with_data("data saved successfully"))
+    resp.headers.add('Access-Control-Allow-Origin', '*')
+    resp.headers.add('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE, HEAD')
+    resp.headers.add('Access-Control-Allow-Headers', 'Content-Type')  # Specify allowed request headers
+    return resp
+
 
