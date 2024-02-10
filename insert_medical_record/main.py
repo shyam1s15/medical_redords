@@ -24,8 +24,6 @@ engine = create_engine(db_url, echo=True)
 # Create a session factory
 Session = sessionmaker(bind=engine)
 
-# Create a session
-session = Session()
 Base = declarative_base()
 
 def non_null_non_empty(data, key):
@@ -58,40 +56,46 @@ class RecordGroup(Base):
 
 def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturnValue:
     # Use request.get_json() to get parsed JSON data
-    json_data = request.get_json()
+        
+    # Create a session
+    session = Session()
+    try:    
+        json_data = request.get_json()
 
-    parsed_opd_date = datetime.strptime(json_data["opd_date"], "%a, %d %b %Y %H:%M:%S %Z").date()
-    parsed_updated_at = datetime.strptime(json_data["updated_at"], "%a, %d %b %Y %H:%M:%S %Z").date()
-    if not non_null_non_empty(json_data, "groups"): 
-        return APIResponse.error_with_code_message(message="groups are not present cannot save")
-    
-    record_saved = Record(
-        id=json_data.get("id"),
-        opd_type=json_data["opd_type"],
-        opd_date=parsed_opd_date,
-        updated_at=parsed_updated_at
-    )
+        parsed_opd_date = datetime.strptime(json_data["opd_date"], "%a, %d %b %Y %H:%M:%S %Z").date()
+        parsed_updated_at = datetime.strptime(json_data["updated_at"], "%a, %d %b %Y %H:%M:%S %Z").date()
+        if not non_null_non_empty(json_data, "groups"): 
+            return APIResponse.error_with_code_message(message="groups are not present cannot save")
+        
+        record_saved = Record(
+            id=json_data.get("id"),
+            opd_type=json_data["opd_type"],
+            opd_date=parsed_opd_date,
+            updated_at=parsed_updated_at
+        )
 
-    record_saved = session.merge(record_saved)
-    session.query(RecordGroup).filter(RecordGroup.record_id == record_saved.id).delete()
-    new_group_data = []
-    for index, group in enumerate(json_data.get("groups")):
-        name = ""
-        if index == 0:
-            name = "0-15 years"
-        elif index == 1:
-            name = "15-60 years"
-        else:
-            name = "60+ years"
-        g = RecordGroup(name=name, new_male=group.get("new_male", 0), new_female=group.get("new_female", 0), old_male=group.get("old_male", 0), old_female=group.get("old_female", 0), record_id=record_saved.id)
-        new_group_data.append(g)
-    session.add_all(new_group_data)
-    session.commit()
+        record_saved = session.merge(record_saved)
+        session.query(RecordGroup).filter(RecordGroup.record_id == record_saved.id).delete()
+        new_group_data = []
+        for index, group in enumerate(json_data.get("groups")):
+            name = ""
+            if index == 0:
+                name = "0-15 years"
+            elif index == 1:
+                name = "15-60 years"
+            else:
+                name = "60+ years"
+            g = RecordGroup(name=name, new_male=group.get("new_male", 0), new_female=group.get("new_female", 0), old_male=group.get("old_male", 0), old_female=group.get("old_female", 0), record_id=record_saved.id)
+            new_group_data.append(g)
+        session.add_all(new_group_data)
+        session.commit()
 
-    resp = flask.jsonify(APIResponse.ok_with_data("data saved successfully"))
-    resp.headers.add('Access-Control-Allow-Origin', '*')
-    resp.headers.add('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE, HEAD')
-    resp.headers.add('Access-Control-Allow-Headers', 'Content-Type')  # Specify allowed request headers
-    return resp
+        resp = flask.jsonify(APIResponse.ok_with_data("data saved successfully"))
+        resp.headers.add('Access-Control-Allow-Origin', '*')
+        resp.headers.add('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE, HEAD')
+        resp.headers.add('Access-Control-Allow-Headers', 'Content-Type')  # Specify allowed request headers
+        return resp
+    finally:
+        session.close()
 
 
