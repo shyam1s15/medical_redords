@@ -1,3 +1,14 @@
+from flask import jsonify
+import flask
+
+headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods":"*",
+		    "Access-Control-Allow-Headers":"*",
+		    "Access-Control-Allow-Credentials":"true",
+		    "Access-Control-Max-Age":"3600"
+        }
+
 class APIResponse:
     def __init__(self):
         self.response = {'error': 0, 'message': 'Success'}
@@ -11,8 +22,15 @@ class APIResponse:
             'response': self.response
         }
         api_content.update(api_response)
-        return api_content
-    
+        resp = jsonify(api_content)
+        resp.headers.add('Access-Control-Allow-Origin', '*')
+        resp.headers.add('Access-Control-Allow-Methods', '*')
+        resp.headers.add('Access-Control-Allow-Headers', "Origin, X-Requested-With, Content-Type, Accept")  
+        resp.headers.add("Access-Control-Max-Age", 3600)
+        resp.headers.add('X-Content-Type-Options', 'nosniff')
+        return resp
+
+
     @classmethod
     def ok(cls):
         # when sending only ok response with empty body

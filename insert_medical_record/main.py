@@ -56,7 +56,18 @@ class RecordGroup(Base):
 
 def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturnValue:
     # Use request.get_json() to get parsed JSON data
-        
+    if request.method == 'OPTIONS':
+    # Allows GET requests from any origin with the Content-Type
+    # header and caches preflight response for an 3600s
+        headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods":"*",
+            "Access-Control-Allow-Headers":"*",
+            "Access-Control-Allow-Credentials":"true",
+            "Access-Control-Max-Age":"3600"
+        }
+
+    return ('', 200, headers)
     # Create a session
     session = Session()
     try:    
@@ -90,11 +101,7 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
         session.add_all(new_group_data)
         session.commit()
 
-        resp = flask.jsonify(APIResponse.ok_with_data("data saved successfully"))
-        resp.headers.add('Access-Control-Allow-Origin', '*')
-        resp.headers.add('Access-Control-Allow-Methods', 'OPTIONS, GET, PUT, POST, DELETE, HEAD')
-        resp.headers.add('Access-Control-Allow-Headers', 'Content-Type')  # Specify allowed request headers
-        return resp
+        return APIResponse.ok_with_data("data saved successfully")
     finally:
         session.close()
 

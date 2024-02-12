@@ -26,6 +26,19 @@ def execute_query(connection, query, params=None):
         return result
 
 def detail_record(request: flask.Request)-> flask.typing.ResponseReturnValue:
+    if request.method == 'OPTIONS':
+    # Allows GET requests from any origin with the Content-Type
+    # header and caches preflight response for an 3600s
+        headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods":"*",
+            "Access-Control-Allow-Headers":"*",
+            "Access-Control-Allow-Credentials":"true",
+            "Access-Control-Max-Age":"3600"
+        }
+
+    return ('', 200, headers)
+
     data = request.get_json()
     id = request.json.get('id', None)
     if id is None:

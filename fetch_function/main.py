@@ -26,6 +26,19 @@ def execute_query(connection, query, params=None):
         return result
     
 def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValue:
+    if request.method == 'OPTIONS':
+        # Allows GET requests from any origin with the Content-Type
+        # header and caches preflight response for an 3600s
+        headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods":"*",
+		    "Access-Control-Allow-Headers":"*",
+		    "Access-Control-Allow-Credentials":"true",
+		    "Access-Control-Max-Age":"3600"
+        }
+
+        return ('', 200, headers)
+
     data = request.get_json()
     page_id = request.json.get('page', {}).get('page_id', 0)
     page_limit = request.json.get('page', {}).get('page_limit', 20)
@@ -67,6 +80,6 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
     except Exception as e:
         print(f"Error: {str(e)}")
         return APIResponse.error_with_code_message("something went wrong ::: " + str(e))
-
+        
     return APIResponse.error_with_code_message("something went wrong")
 
