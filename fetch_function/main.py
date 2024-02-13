@@ -7,6 +7,9 @@ import os
 from psycopg2.extras import RealDictCursor
 
 from api_response import APIResponse
+import firebase_admin
+from firebase_admin import credentials, auth
+import json
 
 db_params = {
     'host': os.environ.get('DB_HOST'),
@@ -16,6 +19,17 @@ db_params = {
     'database': os.environ.get('DB_NAME'),
 }
 
+# Check if the service account key JSON is available as an environment variable
+if 'FIREBASE_SERVICE_ACCOUNT' in os.environ:
+    # Load the service account key from the environment variable
+    service_account_info = json.loads(os.environ['FIREBASE_SERVICE_ACCOUNT'])
+    cred = credentials.Certificate(service_account_info)
+else:
+    # If the environment variable is not set, initialize Firebase Admin SDK without credentials
+    cred = None
+
+firebase_admin.initialize_app(cred)
+
 def execute_query(connection, query, params=None):
     with connection.cursor(cursor_factory=RealDictCursor) as cursor:
         if params:
@@ -24,7 +38,26 @@ def execute_query(connection, query, params=None):
             cursor.execute(query)
         result = cursor.fetchall()
         return result
-    
+
+def auth_user_by_token(request: flask.Request):
+    user_token = request.headers.get("user-token")
+    try:
+        # Verify the Firebase ID token
+        decoded_token = auth.verify_id_token(user_token)
+        # Extract user ID from decoded token
+        uid = decoded_token['uid']
+        # Retrieve user information
+        user = auth.get_user(uid)
+        print(user.uid)
+        print(user.display_name)
+        print(user.email)
+        print(user.disabled)
+        return user
+    except ValueError as e:
+        # Handle invalid tokens or other errors
+        print('Authentication failed:', e)
+        return None
+
 def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValue:
     if request.method == 'OPTIONS':
         # Allows GET requests from any origin with the Content-Type
@@ -38,6 +71,8 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
         }
 
         return ('', 200, headers)
+    user = auth_user_by_token(request=request)
+    print(user)
 
     data = request.get_json()
     page_id = request.json.get('page', {}).get('page_id', 0)
