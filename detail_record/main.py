@@ -6,6 +6,9 @@ from psycopg2 import sql
 import os
 from psycopg2.extras import RealDictCursor
 from api_response import APIResponse
+import firebase_admin
+from firebase_admin import credentials, auth
+import json
 
 db_params = {
     'host': os.environ.get('DB_HOST'),
@@ -15,6 +18,36 @@ db_params = {
     'database': os.environ.get('DB_NAME'),
 }
 
+# Check if the service account key JSON is available as an environment variable
+if 'FIREBASE_SERVICE_ACCOUNT' in os.environ:
+    # Load the service account key from the environment variable
+    service_account_info = json.loads(os.environ['FIREBASE_SERVICE_ACCOUNT'])
+    cred = credentials.Certificate(service_account_info)
+else:
+    # If the environment variable is not set, initialize Firebase Admin SDK without credentials
+    cred = None
+
+firebase_admin.initialize_app(cred)
+
+
+def auth_user_by_token(request: flask.Request):
+    user_token = request.headers.get("user-token")
+    try:
+        # Verify the Firebase ID token
+        decoded_token = auth.verify_id_token(user_token)
+        # Extract user ID from decoded token
+        uid = decoded_token['uid']
+        # Retrieve user information
+        user = auth.get_user(uid)
+        # print(user.uid)
+        # print(user.display_name)
+        # print(user.email)
+        # print(user.disabled)
+        return user.uid
+    except ValueError as e:
+        # Handle invalid tokens or other errors
+        print('Authentication failed:', e)
+        return None
 
 def execute_query(connection, query, params=None):
     with connection.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -37,8 +70,12 @@ def detail_record(request: flask.Request)-> flask.typing.ResponseReturnValue:
             "Access-Control-Max-Age":"3600"
         }
 
-    return ('', 200, headers)
+        return ('', 200, headers)
 
+    user_id = auth_user_by_token(request=request)
+    if user_id is None:
+        return APIResponse.error_with_code_message(message="Unauthorized")
+    
     data = request.get_json()
     id = request.json.get('id', None)
     if id is None:
@@ -50,10 +87,10 @@ def detail_record(request: flask.Request)-> flask.typing.ResponseReturnValue:
                 SELECT r.*, json_agg(g.*) AS groups
                 FROM mo_records r
                 LEFT JOIN record_groups g ON r.id = g.record_id
-                where r.id = %(id)s
+                where r.id = %(id)s and r.firebase_user_id = :user_id
                 GROUP BY r.id""")
         query_params = {
-            "id": id
+            "id": id, "user_id": user_id
         }
         result = execute_query(connection, select_query, query_params)
         return APIResponse.ok_with_data(result)

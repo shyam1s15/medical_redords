@@ -5,6 +5,9 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 from datetime import datetime
 from api_response import APIResponse
+import firebase_admin
+from firebase_admin import credentials, auth
+import json
 
 db_params = {
     'host': os.environ.get('DB_HOST'),
@@ -14,7 +17,18 @@ db_params = {
     'database': os.environ.get('DB_NAME'),
 }
 
-print(db_params)
+# Check if the service account key JSON is available as an environment variable
+if 'FIREBASE_SERVICE_ACCOUNT' in os.environ:
+    # Load the service account key from the environment variable
+    service_account_info = json.loads(os.environ['FIREBASE_SERVICE_ACCOUNT'])
+    cred = credentials.Certificate(service_account_info)
+else:
+    # If the environment variable is not set, initialize Firebase Admin SDK without credentials
+    cred = None
+
+firebase_admin.initialize_app(cred)
+
+
 # Construct the database URL
 db_url = f"postgresql://{db_params['user']}:{db_params['password']}@{db_params['host']}:{db_params['port']}/{db_params['database']}"
 
@@ -42,6 +56,7 @@ class Record(Base):
     opd_type = Column(Integer, name="opd_type")
     updated_at = Column(DateTime, default=datetime.utcnow, name="updated_at")
     opd_date = Column(Date, name="opd_date")
+    firebase_user_id = Column(String, name="firebase_user_id")
 
 class RecordGroup(Base):
     __tablename__ = 'record_groups'
@@ -53,6 +68,24 @@ class RecordGroup(Base):
     old_female = Column(Integer, name="old_female")
     record_id = Column(Integer, name="record_id")
 
+def auth_user_by_token(request: flask.Request):
+    user_token = request.headers.get("user-token")
+    try:
+        # Verify the Firebase ID token
+        decoded_token = auth.verify_id_token(user_token)
+        # Extract user ID from decoded token
+        uid = decoded_token['uid']
+        # Retrieve user information
+        user = auth.get_user(uid)
+        # print(user.uid)
+        # print(user.display_name)
+        # print(user.email)
+        # print(user.disabled)
+        return user.uid
+    except ValueError as e:
+        # Handle invalid tokens or other errors
+        print('Authentication failed:', e)
+        return None
 
 def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturnValue:
     # Use request.get_json() to get parsed JSON data
@@ -67,7 +100,12 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
             "Access-Control-Max-Age":"3600"
         }
 
-    return ('', 200, headers)
+        return ('', 200, headers)
+    
+    user_id = auth_user_by_token(request=request)
+    if user_id is None:
+        return APIResponse.error_with_code_message(message="Unauthorized")
+    
     # Create a session
     session = Session()
     try:    
@@ -82,7 +120,8 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
             id=json_data.get("id"),
             opd_type=json_data["opd_type"],
             opd_date=parsed_opd_date,
-            updated_at=parsed_updated_at
+            updated_at=parsed_updated_at,
+            firebase_user_id=user_id
         )
 
         record_saved = session.merge(record_saved)

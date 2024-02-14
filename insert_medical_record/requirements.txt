@@ -2,3 +2,4 @@ functions-framework==3.*
 flask
 psycopg2-binary
 sqlalchemy
+firebase-admin

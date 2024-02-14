@@ -48,15 +48,16 @@ def auth_user_by_token(request: flask.Request):
         uid = decoded_token['uid']
         # Retrieve user information
         user = auth.get_user(uid)
-        print(user.uid)
-        print(user.display_name)
-        print(user.email)
-        print(user.disabled)
-        return user
+        # print(user.uid)
+        # print(user.display_name)
+        # print(user.email)
+        # print(user.disabled)
+        return user.uid
     except ValueError as e:
         # Handle invalid tokens or other errors
         print('Authentication failed:', e)
         return None
+
 
 def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValue:
     if request.method == 'OPTIONS':
@@ -71,8 +72,9 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
         }
 
         return ('', 200, headers)
-    user = auth_user_by_token(request=request)
-    print(user)
+    user_id = auth_user_by_token(request=request)
+    if user_id is None:
+        return APIResponse.error_with_code_message(message="Unauthorized")
 
     data = request.get_json()
     page_id = request.json.get('page', {}).get('page_id', 0)
@@ -80,16 +82,6 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
     try:
         # Connect to the PostgreSQL database
         connection = psycopg2.connect(**db_params)
-        print(page_id)
-        print(page_limit)
-        # Example SELECT query with named placeholders for pagination
-        
-        # select_query = sql.SQL("""
-        #         SELECT r.*, json_agg(g.*) AS groups
-        #         FROM mo_records r
-        #         LEFT JOIN record_groups g ON r.id = g.record_id
-        #         GROUP BY r.id LIMIT %(limit)s OFFSET %(offset)s""")
-
         
         select_query = sql.SQL("""SELECT 
             r.*, 
@@ -99,13 +91,14 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
             mo_records r 
         JOIN 
             record_groups g ON r.id = g.record_id 
+        where r.firebase_user_id = :user_id 
         GROUP BY 
             r.id 
         ORDER BY r.id desc 
         LIMIT %(limit)s OFFSET %(offset)s""")
 
         # Parameters for the query
-        query_params = {'limit': page_limit, 'offset': page_id*page_limit}
+        query_params = {'limit': page_limit, 'offset': page_id*page_limit, "user_id" : user_id}
 
         # Execute the query and fetch results
         result = execute_query(connection, select_query, query_params)
