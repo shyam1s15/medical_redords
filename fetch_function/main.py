@@ -91,7 +91,7 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
             mo_records r 
         JOIN 
             record_groups g ON r.id = g.record_id 
-        where r.firebase_user_id = :user_id 
+        where r.firebase_user_id = %(user_id)s
         GROUP BY 
             r.id 
         ORDER BY r.id desc 

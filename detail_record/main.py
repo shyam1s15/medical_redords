@@ -87,7 +87,7 @@ def detail_record(request: flask.Request)-> flask.typing.ResponseReturnValue:
                 SELECT r.*, json_agg(g.*) AS groups
                 FROM mo_records r
                 LEFT JOIN record_groups g ON r.id = g.record_id
-                where r.id = %(id)s and r.firebase_user_id = :user_id
+                where r.id = %(id)s and r.firebase_user_id = %(user_id)s
                 GROUP BY r.id""")
         query_params = {
             "id": id, "user_id": user_id
