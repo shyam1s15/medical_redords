@@ -3,7 +3,7 @@ import flask
 from sqlalchemy import Column, DateTime, Integer, String, create_engine, Date
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from api_response import APIResponse
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -116,6 +116,15 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
         if not non_null_non_empty(json_data, "groups"): 
             return APIResponse.error_with_code_message(message="groups are not present cannot save")
         
+        if json_data["id"]:
+            date_exists = session.query(RecordGroup).filter(
+                Record.opd_date >= parsed_opd_date,
+                Record.opd_date < parsed_opd_date + timedelta(days=1),  # Next day
+                Record.firebase_user_id == user_id
+            ).count() > 0
+            if (date_exists):
+                return APIResponse.error_with_data_code_message(object='', message="Error Duplicate Data")
+
         record_saved = Record(
             id=json_data.get("id"),
             opd_type=json_data["opd_type"],
