@@ -9,6 +9,7 @@ import firebase_admin
 from firebase_admin import credentials, auth
 import json
 
+
 db_params = {
     'host': os.environ.get('DB_HOST'),
     'port': os.environ.get('DB_PORT'),
@@ -40,7 +41,11 @@ Session = sessionmaker(bind=engine)
 
 Base = declarative_base()
 
-def non_null_non_empty(data, key):
+def non_null_non_empty_list(collection) -> bool:
+    return collection is not None and bool(collection)
+
+
+def non_null_non_empty(data, key) -> bool:
     value = data.get(key)
     if value is None:
         return False
@@ -77,18 +82,13 @@ def auth_user_by_token(request: flask.Request):
         uid = decoded_token['uid']
         # Retrieve user information
         user = auth.get_user(uid)
-        # print(user.uid)
-        # print(user.display_name)
-        # print(user.email)
-        # print(user.disabled)
         return user.uid
     except ValueError as e:
         # Handle invalid tokens or other errors
         print('Authentication failed:', e)
         return None
 
-def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturnValue:
-    # Use request.get_json() to get parsed JSON data
+def export_medical_records(request: flask.Request) -> flask.typing.ResponseReturnValue:
     if request.method == 'OPTIONS':
     # Allows GET requests from any origin with the Content-Type
     # header and caches preflight response for an 3600s
@@ -102,56 +102,50 @@ def insert_medical_record(request: flask.Request) -> flask.typing.ResponseReturn
 
         return ('', 200, headers)
     
-    user_id = auth_user_by_token(request=request)
-    if user_id is None:
-        return APIResponse.error_with_code_message(message="Unauthorized")
+    # user_id = auth_user_by_token(request=request)
+    # if user_id is None:
+    #     return APIResponse.error_with_code_message(message="Unauthorized")
     
     # Create a session
     session = Session()
     try:    
         json_data = request.get_json()
-
         parsed_opd_date = datetime.strptime(json_data["opd_date"], "%a, %d %b %Y %H:%M:%S %Z").date()
-        parsed_updated_at = datetime.strptime(json_data["updated_at"], "%a, %d %b %Y %H:%M:%S %Z").date()
-        if not non_null_non_empty(json_data, "groups"): 
-            return APIResponse.error_with_code_message(message="groups are not present cannot save")
+
+        month_start_date = parsed_opd_date.replace(day=1)
+        next_month_start_date = (month_start_date + timedelta(days=32)).replace(day=1)
+        month_end_date = next_month_start_date - timedelta(days=1)
+
+        export_date_map = {month_start_date + timedelta(days=i): None for i in range((month_end_date - month_start_date).days + 1)}
+        map_of_records = {}
+
+        records = session.query(Record).filter(Record.opd_date >= month_start_date, Record.opd_date < month_end_date).all()
+
+        export_data = [
+            ["", "New Case", "Old Case", "Total Case"],
+            ["Date", "0-15 Years", "16-60 years", "60 above", "total", "0-15 Years", "16-60 years", "60 above", "total", "0-15 Years", "16-60 years", "60 above", "total"],
+            ["", "M","F", "M", "F", "M", "F", "M", "F", "M","F", "M", "F", "M", "F", "M", "F", "M","F", "M", "F", "M", "F", "M", "F"],
+            # ["abc", 5, 10, 15, 20, 25, 30, 40,50, 5, 10, 15, 20, 25, 30, 40,50, 5, 10, 15, 20, 25, 30, 40,50],
+            # ["Doe Joe", 35, "UK"]
+        ]
+
+        if non_null_non_empty_list(records):
+            record_ids = []
+            for record in records:
+                record_ids.append(record.id)
+                export_date_map[record.opd_date] = record
+            
+            groups = session.query(RecordGroup).filter(RecordGroup.record_id.in_(record_ids)).all()
+            if non_null_non_empty_list(groups):
+                for group in groups:
+                    map_of_records.setdefault(group.record_id, []).append(group)
         
-        if json_data["id"] is None:
-            date_exists = session.query(RecordGroup).filter(
-                Record.opd_date >= parsed_opd_date,
-                Record.opd_date < parsed_opd_date + timedelta(days=1),  # Next day
-                Record.firebase_user_id == user_id
-            ).count() > 0
-            print(date_exists)
-            if (date_exists):
-                return APIResponse.error_with_data_code_message(object='', message="Error Duplicate Data")
+        for i in range((month_end_date - month_start_date).days + 1):
+            date_row = month_start_date + timedelta(days=i)
+            record = export_date_map.get(date_row)
+            print(date_row)
+            if record:
+                print(record.id)
 
-        record_saved = Record(
-            id=json_data.get("id"),
-            opd_type=json_data["opd_type"],
-            opd_date=parsed_opd_date,
-            updated_at=parsed_updated_at,
-            firebase_user_id=user_id
-        )
-
-        record_saved = session.merge(record_saved)
-        session.query(RecordGroup).filter(RecordGroup.record_id == record_saved.id).delete()
-        new_group_data = []
-        for index, group in enumerate(json_data.get("groups")):
-            name = ""
-            if index == 0:
-                name = "0-15 years"
-            elif index == 1:
-                name = "15-60 years"
-            else:
-                name = "60+ years"
-            g = RecordGroup(name=name, new_male=group.get("new_male", 0), new_female=group.get("new_female", 0), old_male=group.get("old_male", 0), old_female=group.get("old_female", 0), record_id=record_saved.id)
-            new_group_data.append(g)
-        session.add_all(new_group_data)
-        session.commit()
-
-        return APIResponse.ok_with_data("data saved successfully")
     finally:
         session.close()
-
-
