@@ -94,7 +94,7 @@ def fetch_records_list(request: flask.Request)-> flask.typing.ResponseReturnValu
         where r.firebase_user_id = %(user_id)s
         GROUP BY 
             r.id 
-        ORDER BY r.id desc 
+        ORDER BY r.opd_date desc 
         LIMIT %(limit)s OFFSET %(offset)s""")
 
         # Parameters for the query
