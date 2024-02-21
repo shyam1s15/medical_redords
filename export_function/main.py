@@ -113,9 +113,9 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
 
         return ('', 200, headers)
     
-    # user_id = auth_user_by_token(request=request)
-    # if user_id is None:
-    #     return APIResponse.error_with_code_message(message="Unauthorized")
+    user_id = auth_user_by_token(request=request)
+    if user_id is None:
+        return APIResponse.error_with_code_message(message="Unauthorized")
     
     # Create a session
     session = Session()
@@ -130,7 +130,7 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
         export_date_map = {month_start_date + timedelta(days=i): None for i in range((month_end_date - month_start_date).days + 1)}
         map_of_records = {}
 
-        records = session.query(Record).filter(Record.opd_date >= month_start_date, Record.opd_date < month_end_date).all()
+        records = session.query(Record).filter(Record.firebase_user_id == user_id, Record.opd_date >= month_start_date, Record.opd_date < month_end_date).all()
 
         export_data = [
             ["", "New Case", "Old Case", "Total Case"],
