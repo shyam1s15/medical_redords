@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from io import BytesIO
+from flask import Flask, request, jsonify, send_file
 import flask
 from sqlalchemy import Column, DateTime, Integer, String, create_engine, Date
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -8,6 +9,7 @@ from api_response import APIResponse
 import firebase_admin
 from firebase_admin import credentials, auth
 import json
+import xlsxwriter
 
 
 db_params = {
@@ -40,6 +42,15 @@ engine = create_engine(db_url, echo=True)
 Session = sessionmaker(bind=engine)
 
 Base = declarative_base()
+
+def format_datetime(dt, fmt="%Y-%m-%d %H:%M:%S"):
+    return dt.strftime(fmt)
+
+def replace_none(value, replacement=0):
+    return value if value is not None else replacement
+
+def sum_nullable(*args):
+    return sum(arg if arg is not None else 0 for arg in args)
 
 def non_null_non_empty_list(collection) -> bool:
     return collection is not None and bool(collection)
@@ -123,8 +134,9 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
 
         export_data = [
             ["", "New Case", "Old Case", "Total Case"],
-            ["Date", "0-15 Years", "16-60 years", "60 above", "total", "0-15 Years", "16-60 years", "60 above", "total", "0-15 Years", "16-60 years", "60 above", "total"],
-            ["", "M","F", "M", "F", "M", "F", "M", "F", "M","F", "M", "F", "M", "F", "M", "F", "M","F", "M", "F", "M", "F", "M", "F"],
+            # ["Date", "0-15 Years", "16-60 years" ,"60 above", "total", "0-15 Years", "16-60 years", "60 above", "total", "0-15 Years", "16-60 years", "60 above", "total"],
+            ["Date"],
+            ["",      "M","F",        "M", "F",    "M", "F",  "M", "F", "M","F",        "M", "F",    "M", "F",  "M", "F",  "M","F",      "M", "F",     "M", "F", "M", "F"],
             # ["abc", 5, 10, 15, 20, 25, 30, 40,50, 5, 10, 15, 20, 25, 30, 40,50, 5, 10, 15, 20, 25, 30, 40,50],
             # ["Doe Joe", 35, "UK"]
         ]
@@ -143,9 +155,105 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
         for i in range((month_end_date - month_start_date).days + 1):
             date_row = month_start_date + timedelta(days=i)
             record = export_date_map.get(date_row)
-            print(date_row)
+            excel_row = []
+            # excel_row.append(date_row)
             if record:
-                print(record.id)
+                groups = map_of_records.get(record.id)
+                up_to_15 = None
+                up_to_60 = None
+                after_60 = None
+                for group in groups:
+                    if group.name == '0-15 years':
+                        up_to_15 = group
+                    elif group.name == "15-60 years":
+                        up_to_60 = group
+                    elif group.name == "60+ years":
+                        after_60 = group
+                    else:
+                        print("ERROR_GROUP_NAME ::: group mismatch with id " + group.id)
+                
+                # NEW CASE
+                excel_row.append(replace_none(up_to_15.new_male))
+                excel_row.append(replace_none(up_to_15.new_female))
+                
+                excel_row.append(replace_none(up_to_60.new_male))
+                excel_row.append(replace_none(up_to_60.new_female))
+
+                excel_row.append(replace_none(after_60.new_male))
+                excel_row.append(replace_none(after_60.new_female))
+
+                excel_row.append(sum_nullable(up_to_15.new_male, up_to_60.new_male, after_60.new_male))
+                excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female))
+
+                # OLD CASE
+                excel_row.append(replace_none(up_to_15.new_male))
+                excel_row.append(replace_none(up_to_15.new_female))
+                
+                excel_row.append(replace_none(up_to_60.new_male))
+                excel_row.append(replace_none(up_to_60.new_female))
+
+                excel_row.append(replace_none(after_60.new_male))
+                excel_row.append(replace_none(after_60.new_female))
+
+                excel_row.append(sum_nullable(up_to_15.new_male, up_to_60.new_male, after_60.new_male))
+                excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female))
+
+                # TOTAL CASE
+                excel_row.append(replace_none(up_to_15.new_male))
+                excel_row.append(replace_none(up_to_15.new_female))
+                
+                excel_row.append(replace_none(up_to_60.new_male))
+                excel_row.append(replace_none(up_to_60.new_female))
+
+                excel_row.append(replace_none(after_60.new_male))
+                excel_row.append(replace_none(after_60.new_female))
+
+                excel_row.append(sum_nullable(up_to_15.new_male, up_to_60.new_male, after_60.new_male))
+                excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female))
+
+                # print(excel_row)
+            else:
+                for i in range(0,24):
+                    excel_row.append(0)
+            export_data.append(excel_row)
+    
+        output = BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet()
+        worksheet.merge_range('B1:I1', 'New Case')
+        worksheet.merge_range('J1:Q1', 'Old Case')
+        worksheet.merge_range('R1:Z1', 'Total Case')
+
+        worksheet.merge_range('B2:C2', '0-15 Years')
+        worksheet.merge_range('D2:E2', '16-60 Years')
+        worksheet.merge_range('F2:G2', '60 Above')
+        worksheet.merge_range('H2:I2', 'Total')
+
+        worksheet.merge_range('J2:K2', '0-15 Years')
+        worksheet.merge_range('L2:M2', '16-60 Years')
+        worksheet.merge_range('N2:O2', '60 Above')
+        worksheet.merge_range('P2:Q2', 'Total')
+
+        worksheet.merge_range('R2:S2', '0-15 Years')
+        worksheet.merge_range('T2:U2', '16-60 Years')
+        worksheet.merge_range('V2:W2', '60 Above')
+        worksheet.merge_range('X2:Y2', 'Total')
+
+        cell_format = workbook.add_format({'align': 'center'})
+
+        # Write data to the worksheet with the cell format
+        for row_num, row_data in enumerate(export_data):
+            for col_num, cell_data in enumerate(row_data):
+                worksheet.write(row_num, col_num, cell_data, cell_format)
+
+        # Save the workbook to a BytesIO object
+        workbook.close()
+        output.seek(0)
+
+        # Return the BytesIO object as the response
+        return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='output.xlsx')
 
     finally:
         session.close()
+
+    return {"data" : export_data}
