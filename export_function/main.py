@@ -186,30 +186,30 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
                 excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female))
 
                 # OLD CASE
-                excel_row.append(replace_none(up_to_15.new_male))
-                excel_row.append(replace_none(up_to_15.new_female))
+                excel_row.append(replace_none(up_to_15.old_male))
+                excel_row.append(replace_none(up_to_15.old_female))
                 
-                excel_row.append(replace_none(up_to_60.new_male))
-                excel_row.append(replace_none(up_to_60.new_female))
+                excel_row.append(replace_none(up_to_60.old_male))
+                excel_row.append(replace_none(up_to_60.old_female))
 
-                excel_row.append(replace_none(after_60.new_male))
-                excel_row.append(replace_none(after_60.new_female))
+                excel_row.append(replace_none(after_60.old_male))
+                excel_row.append(replace_none(after_60.old_female))
 
-                excel_row.append(sum_nullable(up_to_15.new_male, up_to_60.new_male, after_60.new_male))
-                excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female))
+                excel_row.append(sum_nullable(up_to_15.old_male, up_to_60.old_male, after_60.old_male))
+                excel_row.append(sum_nullable(up_to_15.old_female, up_to_60.old_female, after_60.old_female))
 
                 # TOTAL CASE
-                excel_row.append(replace_none(up_to_15.new_male))
-                excel_row.append(replace_none(up_to_15.new_female))
+                excel_row.append(sum_nullable(up_to_15.new_male, up_to_15.old_male))
+                excel_row.append(sum_nullable(up_to_15.new_female, up_to_15.old_female))
                 
-                excel_row.append(replace_none(up_to_60.new_male))
-                excel_row.append(replace_none(up_to_60.new_female))
+                excel_row.append(sum_nullable(up_to_60.new_male, up_to_60.old_male))
+                excel_row.append(sum_nullable(up_to_60.new_female, up_to_60.old_female))
 
-                excel_row.append(replace_none(after_60.new_male))
-                excel_row.append(replace_none(after_60.new_female))
+                excel_row.append(sum_nullable(after_60.new_male, after_60.new_male))
+                excel_row.append(sum_nullable(after_60.new_female, after_60.old_female))
 
-                excel_row.append(sum_nullable(up_to_15.new_male, up_to_60.new_male, after_60.new_male))
-                excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female))
+                excel_row.append(sum_nullable(up_to_15.new_male, up_to_60.new_male, after_60.new_male, up_to_15.old_male, up_to_60.old_male, after_60.old_male))
+                excel_row.append(sum_nullable(up_to_15.new_female, up_to_60.new_female, after_60.new_female, up_to_15.old_female, up_to_60.old_female, after_60.old_female))
 
                 # print(excel_row)
             else:
