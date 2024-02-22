@@ -116,12 +116,13 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
     user_id = auth_user_by_token(request=request)
     if user_id is None:
         return APIResponse.error_with_code_message(message="Unauthorized")
-    
+    print(user_id)
     # Create a session
     session = Session()
     try:    
         json_data = request.get_json()
         parsed_opd_date = datetime.strptime(json_data["opd_date"], "%a, %d %b %Y %H:%M:%S %Z").date()
+        month_name = parsed_opd_date.strftime("%b")
 
         month_start_date = parsed_opd_date.replace(day=1)
         next_month_start_date = (month_start_date + timedelta(days=32)).replace(day=1)
@@ -156,7 +157,7 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
             date_row = month_start_date + timedelta(days=i)
             record = export_date_map.get(date_row)
             excel_row = []
-            # excel_row.append(date_row)
+            excel_row.append(date_row.strftime("%d-%m-%Y"))
             if record:
                 groups = map_of_records.get(record.id)
                 up_to_15 = None
@@ -216,7 +217,16 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
                 for i in range(0,24):
                     excel_row.append(0)
             export_data.append(excel_row)
-    
+        
+        ignored_data = [row[1:] for row in export_data[3:]]
+        column_totals = [sum(col) for col in zip(*ignored_data)]        
+        
+        column_totals.insert(0, "Total")
+        #print(ignored_data)    
+        #print(column_totals)
+
+        export_data.append(column_totals)
+
         output = BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         worksheet = workbook.add_worksheet()
@@ -249,9 +259,18 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
         # Save the workbook to a BytesIO object
         workbook.close()
         output.seek(0)
-
+        excel_file_name = f"{month_name}.xlsx"
+    
+        # print(excel_file_name)
         # Return the BytesIO object as the response
-        return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='output.xlsx')
+        resp = send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=excel_file_name)
+        resp.headers.add('Access-Control-Allow-Origin', '*')
+        resp.headers.add('Access-Control-Allow-Methods', '*')
+        resp.headers.add('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept')
+        resp.headers.add('Access-Control-Max-Age', '3600')
+        resp.headers.add('X-Content-Type-Options', 'nosniff')
+
+        return resp
 
     finally:
         session.close()
