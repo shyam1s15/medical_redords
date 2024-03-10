@@ -94,7 +94,7 @@ def auth_user_by_token(request: flask.Request):
         # Retrieve user information
         user = auth.get_user(uid)
         return user.uid
-    except ValueError as e:
+    except Exception as e:
         # Handle invalid tokens or other errors
         print('Authentication failed:', e)
         return None
@@ -263,11 +263,11 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
         last_row += 1
         worksheet.merge_range(f'B{last_row}:E{last_row}', '0-15 years', cell_format)
         worksheet.merge_range(f'F{last_row}:I{last_row}', '15-60 years', cell_format)
-        worksheet.merge_range(f'J{last_row}:N{last_row}', '>60 years', cell_format)
-        worksheet.merge_range(f'O{last_row}:R{last_row}', '0-15 years', cell_format)
-        worksheet.merge_range(f'S{last_row}:V{last_row}', '15-60 years', cell_format)
-        worksheet.merge_range(f'W{last_row}:Z{last_row}', '>60 years', cell_format)
-        worksheet.merge_range(f'AA{last_row}:AD{last_row}', 'Grand Total', cell_format)
+        worksheet.merge_range(f'J{last_row}:M{last_row}', '>60 years', cell_format)
+        worksheet.merge_range(f'N{last_row}:Q{last_row}', '0-15 years', cell_format)
+        worksheet.merge_range(f'R{last_row}:U{last_row}', '15-60 years', cell_format)
+        worksheet.merge_range(f'V{last_row}:Y{last_row}', '>60 years', cell_format)
+        worksheet.merge_range(f'Z{last_row}:AD{last_row}', 'Grand Total', cell_format)
         last_row += 1
         
         # new
@@ -297,13 +297,15 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
         worksheet.write(f'X{last_row}:Y{last_row}', 'total', cell_format)
         worksheet.write(f'Y{last_row}:Z{last_row}', 'Medicine Days', cell_format)
         #grand total
-        worksheet.write(f'AA{last_row}:AB{last_row}', 'Male', cell_format)
-        worksheet.write(f'AB{last_row}:AC{last_row}', 'Female', cell_format)
-        worksheet.write(f'AC{last_row}:AD{last_row}', 'total', cell_format)
-        worksheet.write(f'AD{last_row}:AE{last_row}', 'Medicine Days', cell_format)
-
+        worksheet.write(f'Z{last_row}:AA{last_row}', 'Male', cell_format)
+        worksheet.write(f'AA{last_row}:AB{last_row}', 'Female', cell_format)
+        worksheet.write(f'AB{last_row}:AC{last_row}', 'total', cell_format)
+        worksheet.write(f'AC{last_row}:AD{last_row}', 'Medicine Days', cell_format)
+        
+        # worksheet.write(f'A{last_row+1}:B{last_row+1}', "Movana", cell_format)
         row = []
         #new
+        row.append("Movana")
         row.append(column_totals[1]) #male
         row.append(column_totals[2]) #female
         row.append(column_totals[1]+column_totals[2]) #total
@@ -343,7 +345,7 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
 
         additional_data = [row]
         
-        for row_num, row_data in enumerate(additional_data, start=last_row + 1):
+        for row_num, row_data in enumerate(additional_data, start=last_row):
             worksheet.write_row(row_num, 0, row_data)
         
         # Save the workbook to a BytesIO object
