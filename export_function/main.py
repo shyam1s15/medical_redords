@@ -256,11 +256,103 @@ def export_medical_records(request: flask.Request) -> flask.typing.ResponseRetur
             for col_num, cell_data in enumerate(row_data):
                 worksheet.write(row_num, col_num, cell_data, cell_format)
 
+        last_row = len(export_data)+2
+        worksheet.merge_range(f'B{last_row}:N{last_row}', 'New', cell_format)
+        worksheet.merge_range(f'O{last_row}:Z{last_row}', 'Old', cell_format)
+        
+        last_row += 1
+        worksheet.merge_range(f'B{last_row}:E{last_row}', '0-15 years', cell_format)
+        worksheet.merge_range(f'F{last_row}:I{last_row}', '15-60 years', cell_format)
+        worksheet.merge_range(f'J{last_row}:N{last_row}', '>60 years', cell_format)
+        worksheet.merge_range(f'O{last_row}:R{last_row}', '0-15 years', cell_format)
+        worksheet.merge_range(f'S{last_row}:V{last_row}', '15-60 years', cell_format)
+        worksheet.merge_range(f'W{last_row}:Z{last_row}', '>60 years', cell_format)
+        worksheet.merge_range(f'AA{last_row}:AD{last_row}', 'Grand Total', cell_format)
+        last_row += 1
+        
+        # new
+        worksheet.write(f'B{last_row}:C{last_row}', 'Male', cell_format)
+        worksheet.write(f'C{last_row}:D{last_row}', 'Female', cell_format)
+        worksheet.write(f'D{last_row}:E{last_row}', 'total', cell_format)
+        worksheet.write(f'E{last_row}:F{last_row}', 'Medicine Days', cell_format)
+        worksheet.write(f'F{last_row}:G{last_row}', 'Male', cell_format)
+        worksheet.write(f'G{last_row}:H{last_row}', 'Female', cell_format)
+        worksheet.write(f'H{last_row}:I{last_row}', 'total', cell_format)
+        worksheet.write(f'I{last_row}:J{last_row}', 'Medicine Days', cell_format)
+        worksheet.write(f'J{last_row}:K{last_row}', 'Male', cell_format)
+        worksheet.write(f'K{last_row}:L{last_row}', 'Female', cell_format)
+        worksheet.write(f'L{last_row}:M{last_row}', 'total', cell_format)
+        worksheet.write(f'M{last_row}:N{last_row}', 'Medicine Days', cell_format)
+        #old
+        worksheet.write(f'N{last_row}:O{last_row}', 'Male', cell_format)
+        worksheet.write(f'O{last_row}:P{last_row}', 'Female', cell_format)
+        worksheet.write(f'P{last_row}:Q{last_row}', 'total', cell_format)
+        worksheet.write(f'Q{last_row}:R{last_row}', 'Medicine Days', cell_format)
+        worksheet.write(f'R{last_row}:S{last_row}', 'Male', cell_format)
+        worksheet.write(f'S{last_row}:T{last_row}', 'Female', cell_format)
+        worksheet.write(f'T{last_row}:U{last_row}', 'total', cell_format)
+        worksheet.write(f'U{last_row}:V{last_row}', 'Medicine Days', cell_format)
+        worksheet.write(f'V{last_row}:W{last_row}', 'Male', cell_format)
+        worksheet.write(f'W{last_row}:X{last_row}', 'Female', cell_format)
+        worksheet.write(f'X{last_row}:Y{last_row}', 'total', cell_format)
+        worksheet.write(f'Y{last_row}:Z{last_row}', 'Medicine Days', cell_format)
+        #grand total
+        worksheet.write(f'AA{last_row}:AB{last_row}', 'Male', cell_format)
+        worksheet.write(f'AB{last_row}:AC{last_row}', 'Female', cell_format)
+        worksheet.write(f'AC{last_row}:AD{last_row}', 'total', cell_format)
+        worksheet.write(f'AD{last_row}:AE{last_row}', 'Medicine Days', cell_format)
+
+        row = []
+        #new
+        row.append(column_totals[1]) #male
+        row.append(column_totals[2]) #female
+        row.append(column_totals[1]+column_totals[2]) #total
+        row.append((column_totals[1]+column_totals[2])*4) #medicine days
+
+        row.append(column_totals[3]) #male
+        row.append(column_totals[4]) #female
+        row.append(column_totals[3]+column_totals[4]) #total
+        row.append((column_totals[3]+column_totals[4])*4) #medicine days
+
+        row.append(column_totals[5]) #male
+        row.append(column_totals[6]) #female
+        row.append(column_totals[5]+column_totals[6]) #total
+        row.append((column_totals[5]+column_totals[6])*4) #medicine days
+
+        # old        
+        row.append(column_totals[9]) #male
+        row.append(column_totals[10]) #female
+        row.append(column_totals[9]+column_totals[10]) #total
+        row.append((column_totals[9]+column_totals[10])*4) #medicine days
+
+        row.append(column_totals[11]) #male
+        row.append(column_totals[12]) #female
+        row.append(column_totals[11]+column_totals[12]) #total
+        row.append((column_totals[11]+column_totals[12])*4) #medicine days
+
+        row.append(column_totals[13]) #male
+        row.append(column_totals[14]) #female
+        row.append(column_totals[13]+column_totals[14]) #total
+        row.append((column_totals[13]+column_totals[14])*4) #medicine days
+
+        #grand total
+        row.append(column_totals[23]) #male
+        row.append(column_totals[24]) #female
+        row.append(column_totals[23]+column_totals[24]) #total
+        row.append((column_totals[23]+column_totals[24])*4) #medicine days
+
+        additional_data = [row]
+        
+        for row_num, row_data in enumerate(additional_data, start=last_row + 1):
+            worksheet.write_row(row_num, 0, row_data)
+        
         # Save the workbook to a BytesIO object
         workbook.close()
         output.seek(0)
-        excel_file_name = f"{month_name}.xlsx"
-    
+        year = parsed_opd_date.year
+        current_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        excel_file_name = f"{month_name}_{year}_{current_timestamp}.xlsx"
+
         # print(excel_file_name)
         # Return the BytesIO object as the response
         resp = send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=excel_file_name)
